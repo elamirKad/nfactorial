@@ -1,6 +1,8 @@
 import socket
 from threading import Thread
 import time
+import os
+import atexit
 
 '''
 Custom Caching Protocol
@@ -27,8 +29,10 @@ class CacheStorage:
         try:
             if self.storage[key]['ttl'] == 0:
                 return True
-            self.delete(key)
-            return self.storage[key]['timestamp'] + self.storage[key]['ttl'] > time.time()
+            if self.storage[key]['timestamp'] + self.storage[key]['ttl'] < time.time():
+                self.delete(key)
+                return False
+            return True
         except:
             return False
 
@@ -51,7 +55,7 @@ class CacheStorage:
         try:
             command, key, value, ttl = self.deserialize(message)
             try:
-                ttl = int(ttl)
+                ttl = float(ttl)
             except:
                 pass
             if command == 'GET':
@@ -66,26 +70,73 @@ class CacheStorage:
         except:
             return None
 
+    def save_to_file(self):
+        with open('cache', 'wb') as file:
+            for key, value in self.storage.items():
+                if value['ttl'] == 0:
+                    ttl = 0
+                else:
+                    if value['timestamp'] + value['ttl'] - time.time() < 0:
+                        continue
+                    ttl = value['ttl']
+                set_value = value['value']
+                timestamp = value['timestamp']
+                line = f"{key}\r\n{set_value}\r\n{ttl}\r\n{timestamp};"
+                line = line.encode('utf8')
+                file.write(line)
 
-# call = "SET\r\nlol\r\nkek\r\n1"
-# result = CacheStorage.deserialize(call)
-# print(result)
-# print(CacheStorage.serialize(*result))
+    def load_file(self):
+        with open('cache', 'rb') as file:
+            commands = file.read().decode('utf8').split(';')[:-1]
+            print(commands)
+            for command in commands:
+                key, value, ttl, timestamp = command.split('\r\n')
+                print(key, value, ttl, timestamp)
+                if float(ttl) == 0.0:
+                    self.post(key, value, 0)
+                    continue
+                if time.time() > float(timestamp) + float(ttl):
+                    continue
+                self.post(key, value, float(timestamp) + float(ttl) - time.time())
+
+
+storage = CacheStorage()
+if os.path.exists('cache'):
+    storage.load_file()
+
+# call = "SET\r\nlol\r\nkek\r\n3600"
 # storage = CacheStorage()
 # print(storage.run_command(call))
+# call = "SET\r\nlil\r\nkek\r\n3600"
+# print(storage.run_command(call))
 # call = "GET\r\nlol\r\n\r\n"
-# time.sleep(2)
 # print(storage.run_command(call))
 # print(storage.storage)
+# storage.save_to_file()
+# storage.load_file()
+# print(storage.storage)
+
+
+def exit_handler():
+    storage.save_to_file()
+
+
+atexit.register(exit_handler)
 
 
 def new_connection(clientsocket, address):
     while True:
-        data = clientsocket.recv(1024).decode()
+        data = clientsocket.recv(1024).decode('utf-8')
         if not data:
             break
         print(str(data))
-        clientsocket.send("success!".encode())
+        print(storage.deserialize(data))
+        answer = storage.run_command(data)
+        if answer is None:
+            answer = "Done"
+        else:
+            answer = str(answer)
+        clientsocket.send(answer.encode())
 
     clientsocket.close()
 
