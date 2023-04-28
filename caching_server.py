@@ -1,5 +1,6 @@
 import socket
 from threading import Thread
+import time
 
 '''
 Custom Caching Protocol
@@ -22,11 +23,60 @@ class CacheStorage:
     def serialize(cls, command, key, value='', ttl=0):
         return f"{command}\r\n{key}\r\n{value}\r\n{ttl}"
 
+    def check_ttl(self, key):
+        try:
+            if self.storage[key]['ttl'] == 0:
+                return True
+            self.delete(key)
+            return self.storage[key]['timestamp'] + self.storage[key]['ttl'] > time.time()
+        except:
+            return False
 
-# call = "SET\r\nlol\r\n\r\n0"
+    def get(self, key):
+        if self.check_ttl(key):
+            return self.storage[key]
+        return None
+
+    def post(self, key, value, ttl):
+        self.storage[key] = {
+            'value': value,
+            'timestamp': time.time(),
+            'ttl': ttl
+        }
+
+    def delete(self, key):
+        self.storage.pop(key)
+
+    def run_command(self, message):
+        try:
+            command, key, value, ttl = self.deserialize(message)
+            try:
+                ttl = int(ttl)
+            except:
+                pass
+            if command == 'GET':
+                return self.get(key)
+            elif command == 'SET':
+                self.post(key, value, ttl)
+            elif command == 'UPD':
+                pass
+            elif command == 'DEL':
+                self.delete(key)
+            return None
+        except:
+            return None
+
+
+# call = "SET\r\nlol\r\nkek\r\n1"
 # result = CacheStorage.deserialize(call)
 # print(result)
 # print(CacheStorage.serialize(*result))
+# storage = CacheStorage()
+# print(storage.run_command(call))
+# call = "GET\r\nlol\r\n\r\n"
+# time.sleep(2)
+# print(storage.run_command(call))
+# print(storage.storage)
 
 
 def new_connection(clientsocket, address):
