@@ -1,4 +1,5 @@
 import socket
+import threading
 from threading import Thread
 import time
 import os
@@ -141,11 +142,21 @@ def new_connection(clientsocket, address):
     clientsocket.close()
 
 
+def cache_backup():
+    while True:
+        time.sleep(60)
+        storage.save_to_file()
+        print("Saved cache to file")
+
+
+backup_thread = Thread(target=cache_backup)
+backup_thread.daemon = True
+backup_thread.start()
+
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serversocket.bind((socket.gethostname(), 6379))
 serversocket.listen(5)
 print("Waiting for connections...")
-
 while True:
     (clientsocket, address) = serversocket.accept()
     print("Received connection from", clientsocket)

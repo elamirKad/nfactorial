@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  cache:
+    build:
+      context: ./cache/
+      dockerfile: Dockerfile
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - default
+
+networks:
+  default:

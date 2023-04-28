@@ -15,7 +15,8 @@ class CacheClient(Thread):
             ready = select.select([self.clientsocket], [], [], 0.1)
             if ready[0]:
                 data = self.clientsocket.recv(1024).decode()
-                print(data)
+                if data is None or data == ' ':
+                    break
         self.clientsocket.close()
 
     def get(self, key):
@@ -43,6 +44,6 @@ cache_client = CacheClient()
 cache_client.start()
 
 cache_client.set("lol", 0)
-cache_client.delete("lol")
+# cache_client.delete("lol")
 result = cache_client.get("lol")
 print(result)
