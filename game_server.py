@@ -3,7 +3,6 @@ import socket
 clientsocket = socket.socket()
 clientsocket.connect((socket.gethostname(), 6379))
 print(socket.gethostname())
-
 while True:
     message = input("Input: ")
     if not message:
