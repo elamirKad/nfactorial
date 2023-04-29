@@ -104,18 +104,6 @@ storage = CacheStorage()
 if os.path.exists('cache'):
     storage.load_file()
 
-# call = "SET\r\nlol\r\nkek\r\n3600"
-# storage = CacheStorage()
-# print(storage.run_command(call))
-# call = "SET\r\nlil\r\nkek\r\n3600"
-# print(storage.run_command(call))
-# call = "GET\r\nlol\r\n\r\n"
-# print(storage.run_command(call))
-# print(storage.storage)
-# storage.save_to_file()
-# storage.load_file()
-# print(storage.storage)
-
 
 def exit_handler():
     storage.save_to_file()

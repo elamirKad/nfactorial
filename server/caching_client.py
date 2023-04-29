@@ -38,12 +38,3 @@ class CacheClient(Thread):
         self.clientsocket.send(message.encode().decode('unicode_escape').encode("raw_unicode_escape"))
         data = self.clientsocket.recv(1024).decode()
         return data
-
-
-cache_client = CacheClient()
-cache_client.start()
-
-cache_client.set("lol", 0)
-# cache_client.delete("lol")
-result = cache_client.get("lol")
-print(result)
