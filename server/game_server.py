@@ -58,6 +58,7 @@ def new_connection(clientsocket, address):
 
     while True:
         data = clientsocket.recv(1024).decode('utf-8')
+        print("\nResult:", data)
         if not data:
             break
         if data[:3] == "UPD":
@@ -69,8 +70,6 @@ def new_connection(clientsocket, address):
                 client_sockets[username][2] = score
             client_sockets[username][3] = score
             client_sockets[username][4] = current_state
-            answer = "OK"
-            clientsocket.send(answer.encode())
     client_sockets.pop(username)
     clientsocket.close()
 
@@ -79,8 +78,8 @@ def sending_stats():
     while True:
         time.sleep(2)
         stats = 'UPD\r\n' + ';'.join([str(x[1]) + ':' + str(x[3]) for x in client_sockets.values()])
-        print(stats)
-        print(client_sockets)
+        # print(stats)
+        # print(client_sockets)
         try:
             for key, users in client_sockets.items():
                 try:
