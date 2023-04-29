@@ -12,10 +12,32 @@ pygame.init()
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREY = (128, 128, 128)
+TILE_COLORS = {
+    2: (238, 228, 218),
+    4: (237, 224, 200),
+    8: (242, 177, 121),
+    16: (245, 149, 99),
+    32: (246, 124, 95),
+    64: (246, 94, 59),
+    128: (237, 207, 114),
+    256: (237, 204, 97),
+    512: (237, 200, 80),
+    1024: (237, 197, 63),
+    2048: (237, 194, 46),
+    4096: (171, 191, 38),
+    8192: (143, 188, 38),
+    16384: (115, 185, 38),
+    32768: (87, 182, 38),
+    65536: (59, 179, 38),
+    131072: (31, 176, 38),
+    262144: (0, 173, 38),
+    524288: (0, 162, 255),
+    1048576: (0, 143, 255),
+}
 
 
 class Board:
-    def __init__(self, clientsocket, score, size=3, state=None):
+    def __init__(self, clientsocket, score, size, state=None):
         self.clientsocket = clientsocket
         self.size = size
         if state is None:
@@ -25,7 +47,7 @@ class Board:
         self.score = score
         self.tile_size = 80
         self.padding = 10
-        self.screen_size = (self.tile_size * size + self.padding * (size + 1),
+        self.screen_size = (self.tile_size * size + self.padding * (size + 1)+200,
                             self.tile_size * size + self.padding * (size + 1)+100)
         self.screen = pygame.display.set_mode(self.screen_size)
         self.stats = {}
@@ -57,6 +79,21 @@ class Board:
         else:
             return False
 
+    def draw_sidebar(self):
+        sidebar_width = 200
+        sidebar_x = self.tile_size * self.size + self.padding * (self.size + 2)
+        sidebar_y = 0
+        sidebar_height = self.tile_size * self.size + self.padding * (self.size + 1) + 100
+        sidebar_rect = pygame.Rect(sidebar_x, sidebar_y, sidebar_width, sidebar_height)
+        pygame.draw.rect(self.screen, GREY, sidebar_rect)
+
+        font = pygame.font.SysFont(None, 20)
+        y_offset = self.padding * 2
+        for username, score in self.stats.items():
+            score_text = font.render(f"{username}: {score}", True, BLACK)
+            self.screen.blit(score_text, (sidebar_x + self.padding, sidebar_y + y_offset))
+            y_offset += font.size(f"{username}: {score}")[1] + self.padding
+
     def draw_board(self):
         self.screen.fill(WHITE)
         font = pygame.font.SysFont(None, 40)
@@ -68,7 +105,11 @@ class Board:
                 tile_rect = pygame.Rect((j + 1) * self.padding + j * self.tile_size,
                                         (i + 1) * self.padding + i * self.tile_size + 100,
                                         self.tile_size, self.tile_size)
-                pygame.draw.rect(self.screen, GREY, tile_rect)
+                if tile in TILE_COLORS:
+                    tile_color = TILE_COLORS[tile]
+                else:
+                    tile_color = GREY
+                pygame.draw.rect(self.screen, tile_color, tile_rect)
                 if tile != 0:
                     tile_text = font.render(str(tile), True, BLACK)
                     text_rect = tile_text.get_rect(center=tile_rect.center)
@@ -80,6 +121,7 @@ class Board:
                                         self.padding)
                 pygame.draw.rect(self.screen, BLACK, line_rect)
 
+        self.draw_sidebar()
         pygame.display.flip()
 
     def move_up(self):
@@ -213,6 +255,8 @@ def fetch_stats(clientsocket, board):
                 score = int(score)
                 board.stats[user] = score
             print(board.stats)
+            board.draw_sidebar()
+            pygame.display.flip()
         except:
             pass
 
@@ -233,17 +277,20 @@ def connect_to_server(username, password):
     clientsocket.send(auth_msg)
     return clientsocket
 
+
 def process_auth_result(auth_result):
     command, record, score, state = auth_result.split('\r\n')
     score = int(score)
-
+    size = 0
     if state != 'None':
         state = ast.literal_eval(state)
         state = [[int(cell) if isinstance(cell, str) and cell.isdigit() else cell
                   for cell in row] for row in state]
+        size = len(state)
         if not has_no_zeros(state):
             state = 'None'
-    return score, state
+    return score, state, size
+
 
 def handle_key_event(event, board):
     if event.key == pygame.K_LEFT:
@@ -255,17 +302,18 @@ def handle_key_event(event, board):
     elif event.key == pygame.K_DOWN:
         return board.move_down()
 
-def main(username, password):
+
+def main(username, password, size):
     clientsocket = connect_to_server(username, password)
     auth_result = clientsocket.recv(1024).decode()
-    score, state = process_auth_result(auth_result)
+    score, state, prev_size = process_auth_result(auth_result)
 
     if state == 'None':
-        board = Board(clientsocket, 0, 3)
+        board = Board(clientsocket, 0, size)
         board.create_random_tile()
         board.create_random_tile()
     else:
-        board = Board(clientsocket, score, 3, state)
+        board = Board(clientsocket, score, prev_size, state)
 
     board.draw_board()
 
@@ -288,7 +336,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-u", "--username", help="The username")
     parser.add_argument("-p", "--password", help="The password")
+    parser.add_argument("-d", "--difficulty", type=int, choices=[1, 2, 3], default=1,
+                        help="The difficulty level: 1 (easy), 2 (medium), or 3 (hard)")
     args = parser.parse_args()
     username = args.username
     password = args.password
-    main(username, password)
+    difficulty = args.difficulty
+    size = 6 - difficulty
+    main(username, password, size)
