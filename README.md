@@ -19,6 +19,58 @@ This project demonstrates a 2048 game with various functionalities, such as:
 6.  Cache implementation for storing data in key-value storage
 7.  Docker setup for easy deployment
 8.  Deployed on the VPS to play online with other people
+9.  Load balancer [IN DEVELOPMENT]
+
+Protocols
+-----------
+
+### Custom Caching Protocol
+
+The custom caching protocol uses the following format for messages:
+
+`{COMMAND}\r\n{KEY}\r\n{VALUE:optional}\r\n{TTL}`
+
+#### Commands:
+
+- GET: Retrieve a value for a given key.
+- SET: Store a key-value pair.
+- UPD: Update a key-value pair.
+- DEL: Delete a key-value pair.
+
+#### TTL (Time To Live):
+
+- The time duration (in seconds) until the key-value pair expires.
+- Default value is 0, which means the data will not expire.
+
+#### Separator:
+
+- Use ; for separating multiple commands.
+
+#### Example:
+
+`SET\r\nuser1\r\n1000\r\n3600`
+
+### Custom Game Server-Client Protocol
+
+#### Authentication request and response:
+
+Request:
+
+`AUTH\r\n{username}\r\n{password}`
+
+Response:
+
+`AUTH\r\n{record}\r\n{score}\r\n{previous_state}`
+
+#### Update request and response:
+
+Request:
+
+`UPD\r\n{score}\r\n{current_state}`
+
+Response:
+
+`UPD\r\n{scores_dict}`
 
 Installation
 ------------
@@ -39,7 +91,7 @@ To get started with this project, follow these steps:
     
 3.  Install the required dependencies:
     
-    `pip install -r requirements.txt`
+    `pip install -r game_client/requirements.txt`
      
 
 Usage
@@ -56,7 +108,7 @@ The command-line interface supports the following arguments:
 
 Example command:
 
-```css
+```bash
 python game_client/game_client.py -u john_doe -p pass -d 1 -b
 ```
 
