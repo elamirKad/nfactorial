@@ -1,11 +1,14 @@
 import random
 import os
 import sys
+import time
+
 import pygame
 from threading import Thread
 import socket
 import ast
 import argparse
+from bot.final_bot import predict_next_move
 
 
 pygame.init()
@@ -59,8 +62,6 @@ class Board:
 
     def calculate_score(self, increase):
         self.score += increase
-        send = f'UPD\r\n{self.score}\r\n{self.board}'
-        self.clientsocket.send(send.encode().decode('unicode_escape').encode("raw_unicode_escape"))
 
     def check_cell_empty(self, x, y):
         return self.board[x][y] == 0
@@ -74,7 +75,7 @@ class Board:
 
         if empty_cells:
             x, y = random.choice(empty_cells)
-            self.board[x][y] = 2
+            self.board[x][y] = random.choice([2, 4])
             return True
         else:
             return False
@@ -244,6 +245,24 @@ class Board:
         self.screen.blit(game_over_screen, (0, 0))
         pygame.display.flip()
 
+    def get_current_state(self):
+        matrix = self.board
+        score = self.score
+        return (matrix, score, ())
+
+    def handle_bot_move(self, move):
+        move_func = {
+            "left": self.move_left,
+            "right": self.move_right,
+            "up": self.move_up,
+            "down": self.move_down
+        }
+
+        if move in move_func:
+            return move_func[move]()
+        else:
+            raise ValueError(f"Invalid move: {move}")
+
 
 def fetch_stats(clientsocket, board):
     while True:
@@ -254,7 +273,7 @@ def fetch_stats(clientsocket, board):
                 user, score = stat.split(':')
                 score = int(score)
                 board.stats[user] = score
-            print(board.stats)
+            # print(board.stats)
             board.draw_sidebar()
             pygame.display.flip()
         except:
@@ -303,7 +322,15 @@ def handle_key_event(event, board):
         return board.move_down()
 
 
-def main(username, password, size):
+def send_score(clientsocket, board):
+    while True:
+        time.sleep(2)
+        send = f'UPD\r\n{board.score}\r\n{board.board}'
+        clientsocket.send(send.encode().decode('unicode_escape').encode("raw_unicode_escape"))
+
+
+
+def main(username, password, size, use_bot=False):
     clientsocket = connect_to_server(username, password)
     auth_result = clientsocket.recv(1024).decode()
     score, state, prev_size = process_auth_result(auth_result)
@@ -321,15 +348,38 @@ def main(username, password, size):
     stats_thread.daemon = True
     stats_thread.start()
 
+    score_thread = Thread(target=send_score, args=(clientsocket, board,))
+    score_thread.daemon = True
+    score_thread.start()
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
-            if event.type == pygame.KEYDOWN:
-                if not handle_key_event(event, board):
-                    board.show_game_over_screen()
+            if use_bot and event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                use_bot = False
+
+            # if not use_bot and event.type == pygame.KEYDOWN:
+            #     if not handle_key_event(event, board):
+            #         board.show_game_over_screen()
+
+        if use_bot:
+            try:
+                current_state = board.get_current_state()
+                best_move = predict_next_move(current_state)
+                board.handle_bot_move(best_move)
+                board.draw_board()
+            except:
+                break
+
+    board.show_game_over_screen()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
 
 if __name__ == "__main__":
@@ -338,9 +388,11 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--password", help="The password")
     parser.add_argument("-d", "--difficulty", type=int, choices=[1, 2, 3], default=1,
                         help="The difficulty level: 1 (easy), 2 (medium), or 3 (hard)")
+    parser.add_argument("-b", "--bot", action="store_true", help="Use bot to play the game")
     args = parser.parse_args()
     username = args.username
     password = args.password
     difficulty = args.difficulty
+    use_bot = args.bot
     size = 6 - difficulty
-    main(username, password, size)
+    main(username, password, size, use_bot)
