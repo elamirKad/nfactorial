@@ -16,6 +16,7 @@ Use ';' for separating
 class CacheStorage:
     def __init__(self):
         self.storage = {}
+        self.changed = False
 
     @classmethod
     def deserialize(cls, message):
@@ -42,6 +43,7 @@ class CacheStorage:
         return None
 
     def post(self, key, value, ttl):
+        self.changed = True
         self.storage[key] = {
             'value': value,
             'timestamp': time.time(),
@@ -49,6 +51,7 @@ class CacheStorage:
         }
 
     def delete(self, key):
+        self.changed = True
         self.storage.pop(key)
 
     def run_command(self, message):
@@ -120,11 +123,14 @@ def new_connection(clientsocket, address):
         print(str(data))
         print(storage.deserialize(data))
         answer = storage.run_command(data)
+        print(answer)
         if answer is None:
             answer = "Done"
         else:
             answer = str(answer)
+        print(answer)
         clientsocket.send(answer.encode())
+        print("SEND")
 
     clientsocket.close()
 
@@ -132,8 +138,10 @@ def new_connection(clientsocket, address):
 def cache_backup():
     while True:
         time.sleep(60)
-        storage.save_to_file()
-        print("Saved cache to file")
+        if storage.changed:
+            storage.save_to_file()
+            print("Saved cache to file")
+            storage.changed = False
 
 
 backup_thread = Thread(target=cache_backup)
@@ -141,7 +149,7 @@ backup_thread.daemon = True
 backup_thread.start()
 
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serversocket.bind((socket.gethostname(), 6379))
+serversocket.bind(('0.0.0.0', 6379))
 serversocket.listen(5)
 print("Waiting for connections...")
 while True:

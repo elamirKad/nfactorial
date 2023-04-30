@@ -20,42 +20,71 @@ def new_connection(clientsocket, address):
         if command != "AUTH":
             print("QUIT")
             return
-        result = cache_client.get(username)
-        print(result, type(result))
-        if result is None:
-            cache_client.set(username, password)
-            cache_client.set(f"{username}.record", 0)
-            cache_client.set(f"{username}.score", 0)
-            cache_client.set(f"{username}.state", 'None')
-            client = [clientsocket, username, 0, 0, 'None']
-        else:
-            result = json.loads(result.replace("\'", "\""))['value']
-            if result != password:
-                clientsocket.close()
-                return
-            record = cache_client.get(f"{username}.record")
-            record = json.loads(record.replace("\'", "\""))['value']
-            print(record)
-            if record is None:
-                record = 0
-            score = cache_client.get(f"{username}.score")
-            score = json.loads(score.replace("\'", "\""))['value']
-            if score is None:
-                score = 0
-            state = cache_client.get(f"{username}.state")
-            state = json.loads(state.replace("\'", "\""))['value']
-            if state == 'None' or state is None:
-                state = 'None'
-            client = [clientsocket, username, record, score, state]
-        client_sockets[username] = client
-        print(client_sockets)
-        answer = f"AUTH\r\n{client[2]}\r\n{client[3]}\r\n{client[4]}"
-        clientsocket.send(answer.encode())
+
+        initialize_client(clientsocket, username, password)
+        process_client_messages(clientsocket, username)
     except Exception as e:
         print(e)
         clientsocket.close()
         return
 
+
+def initialize_client(clientsocket, username, password):
+    print("check")
+    result = cache_client.get(username)
+    print(result, type(result))
+    if result is None or result == '':
+        create_new_client(clientsocket, username, password)
+    else:
+        load_existing_client(clientsocket, username, password, result)
+
+
+def create_new_client(clientsocket, username, password):
+    cache_client.set(username, password)
+    cache_client.set(f"{username}.record", 0)
+    cache_client.set(f"{username}.score", 0)
+    cache_client.set(f"{username}.state", 'None')
+    client = [clientsocket, username, 0, 0, 'None']
+    client_sockets[username] = client
+    print(client_sockets)
+    send_auth_response(clientsocket, client)
+
+
+def load_existing_client(clientsocket, username, password, result):
+    stored_password = json.loads(result.replace("'", "\""))['value']
+    if stored_password != password:
+        clientsocket.close()
+        return
+
+    record, score, state = fetch_client_data(username)
+    client = [clientsocket, username, record, score, state]
+    client_sockets[username] = client
+    print(client_sockets)
+    send_auth_response(clientsocket, client)
+
+
+def fetch_client_data(username):
+    record = get_cached_value(f"{username}.record")
+    score = get_cached_value(f"{username}.score")
+    state = get_cached_value(f"{username}.state", default_value='None')
+
+    return record, score, state
+
+
+def get_cached_value(key, default_value=None):
+    value = cache_client.get(key)
+    if value is None:
+        return default_value
+
+    return json.loads(value.replace("'", "\""))['value']
+
+
+def send_auth_response(clientsocket, client):
+    answer = f"AUTH\r\n{client[2]}\r\n{client[3]}\r\n{client[4]}"
+    clientsocket.send(answer.encode())
+
+
+def process_client_messages(clientsocket, username):
     while True:
         data = clientsocket.recv(1024).decode('utf-8')
         print("\nResult:", data)
@@ -63,15 +92,20 @@ def new_connection(clientsocket, address):
             break
         if data[:3] == "UPD":
             command, score, current_state = data.split('\r\n')
-            cache_client.set(f"{username}.state", current_state)
-            cache_client.set(f"{username}.score", score)
-            if int(score) > int(client_sockets[username][2]):
-                cache_client.set(f"{username}.record", score)
-                client_sockets[username][2] = score
-            client_sockets[username][3] = score
-            client_sockets[username][4] = current_state
+            update_client_data(username, score, current_state)
+
     client_sockets.pop(username)
     clientsocket.close()
+
+
+def update_client_data(username, score, current_state):
+    cache_client.set(f"{username}.state", current_state)
+    cache_client.set(f"{username}.score", score)
+    if int(score) > int(client_sockets[username][2]):
+        cache_client.set(f"{username}.record", score)
+        client_sockets[username][2] = score
+    client_sockets[username][3] = score
+    client_sockets[username][4] = current_state
 
 
 def sending_stats():
@@ -97,7 +131,7 @@ stats_thread.start()
 
 
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serversocket.bind((socket.gethostname(), 2048))
+serversocket.bind(('0.0.0.0', 2048))
 serversocket.listen(30)
 print("Waiting for connections...")
 while True:

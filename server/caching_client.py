@@ -8,21 +8,18 @@ class CacheClient(Thread):
     def __init__(self, port=6379):
         Thread.__init__(self)
         self.clientsocket = socket.socket()
-        self.clientsocket.connect((socket.gethostname(), port))
+        self.clientsocket.connect(('localhost', port))
 
     def run(self):
         while True:
-            ready = select.select([self.clientsocket], [], [], 0.1)
-            if ready[0]:
-                data = self.clientsocket.recv(1024).decode()
-                if data is None or data == ' ':
-                    break
+            pass
         self.clientsocket.close()
 
     def get(self, key):
         message = f"GET\r\n{key}\r\n\r\n"
         self.clientsocket.send(message.encode().decode('unicode_escape').encode("raw_unicode_escape"))
         data = self.clientsocket.recv(1024).decode()
+        print("Client:", data)
         if data == "Done":
             return None
         return data

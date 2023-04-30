@@ -290,7 +290,7 @@ def has_no_zeros(arr):
 
 def connect_to_server(username, password):
     clientsocket = socket.socket()
-    clientsocket.connect((socket.gethostname(), 2048))
+    clientsocket.connect(('194.233.163.92', 2048))
     auth_msg = f'AUTH\r\n{username}\r\n{password}'
     auth_msg = auth_msg.encode().decode('unicode_escape').encode("raw_unicode_escape")
     clientsocket.send(auth_msg)
@@ -361,9 +361,9 @@ def main(username, password, size, use_bot=False):
             if use_bot and event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 use_bot = False
 
-            # if not use_bot and event.type == pygame.KEYDOWN:
-            #     if not handle_key_event(event, board):
-            #         board.show_game_over_screen()
+            if not use_bot and event.type == pygame.KEYDOWN:
+                if not handle_key_event(event, board):
+                    board.show_game_over_screen()
 
         if use_bot:
             try:
