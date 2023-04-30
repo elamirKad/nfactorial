@@ -1,19 +1,13 @@
-from threading import Thread
 import socket
 
-import select
 
-
-class CacheClient(Thread):
+class CacheClient():
     def __init__(self, port=6379):
-        Thread.__init__(self)
         self.clientsocket = socket.socket()
-        self.clientsocket.connect(('localhost', port))
+        self.port = port
 
     def run(self):
-        while True:
-            pass
-        self.clientsocket.close()
+        self.clientsocket.connect(('localhost', self.port))
 
     def get(self, key):
         message = f"GET\r\n{key}\r\n\r\n"
@@ -35,3 +29,6 @@ class CacheClient(Thread):
         self.clientsocket.send(message.encode().decode('unicode_escape').encode("raw_unicode_escape"))
         data = self.clientsocket.recv(1024).decode()
         return data
+
+    def stop(self):
+        self.clientsocket.close()

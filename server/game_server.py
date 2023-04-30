@@ -3,10 +3,12 @@ import socket
 import time
 from threading import Thread
 from caching_client import CacheClient
+import sys
+import signal
 
 
 cache_client = CacheClient()
-cache_client.start()
+cache_client.run()
 
 client_sockets = {}
 
@@ -130,6 +132,16 @@ stats_thread.daemon = True
 stats_thread.start()
 
 
+def signal_handler(sig, frame):
+    print('You pressed Ctrl+C!')
+    serversocket.close()
+    cache_client.stop()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
+
+
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serversocket.bind(('0.0.0.0', 2048))
 serversocket.listen(30)
@@ -138,8 +150,6 @@ while True:
     (clientsocket, address) = serversocket.accept()
     print("Received connection from", clientsocket)
     conn = Thread(target=new_connection, args=(clientsocket, address))
-
+    conn.daemon = True
     conn.start()
 
-
-serversocket.close()
